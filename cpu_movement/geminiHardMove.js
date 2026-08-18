@@ -32,12 +32,26 @@ function buildBoardString(state) {
 // Build the plain-language prompt that asks Gemini for the next black move.
 function buildPrompt(state) {
   // Step 1: Convert the current board state into a readable board string.
-  // Step 2: Write a prompt that tells Gemini it is playing as Black.
+  const boardString = buildBoardString(state);
+
+  // Step 2: Write a prompt that tells Gemini it is playing as Blue.
+  const playerInstruction = 'You are playing checkers as Blue (player 2).';
+
   // Step 3: Include the board string in the prompt so Gemini can see the current position.
+  const boardInstruction = 'Current board:\n' + boardString;
+
   // Step 4: Ask Gemini for the next move only.
+  const moveInstruction = 'Choose Blue\'s next move and return only the best move.';
+
   // Step 5: Instruct Gemini to return strict JSON in this shape: {"from":[row,col],"to":[row,col]}.
+  const formatInstruction = [
+    'Return strict JSON in exactly this shape:',
+    '{"from":[row,col],"to":[row,col]}',
+    'Do not include markdown or an explanation.'
+  ].join('\n');
+
   // Step 6: Return the completed prompt string.
-  return '';
+  return [playerInstruction, boardInstruction, moveInstruction, formatInstruction].join('\n\n');
 }
 
 // Call Gemini with the current board state and return the move coordinates it suggests.
