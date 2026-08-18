@@ -1,6 +1,6 @@
-import { chooseEasyMove } from './easyMove.js';
-import { chooseHardHeuristicMove } from './hardHeuristicMove.js';
-import { chooseGeminiMove } from './geminiMove.js';
+import { chooseEasyMove } from './easymove.js';
+import { chooseEasyMove as chooseHardHeuristicMove } from './easymove.js';
+import { chooseGeminiMove } from './geminiHardMove.js';
 
 // Main CPU router: choose easy heuristic, Gemini hard mode, or heuristic fallback.
 export async function resolveCpuMove({ state, legalMoves, difficulty, apiKey }) {
