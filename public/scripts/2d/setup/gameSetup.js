@@ -30,42 +30,53 @@ export function initializeGame() {
 
     function setSaveStatus(message, isError) {
       if (!dom.saveStatus) return;
-      // Step 1.1: Set status text for save/resume actions.
-      // Step 1.2: Use error color when isError is true, otherwise use normal status color.
+      dom.saveStatus.textContent = message;
+      dom.saveStatus.style.color = isError ? 'red' : 'green';
     }
 
     async function persistState(state) {
-      // Step 2.1: POST { state } to /api/checkers/2d/save.
-      // Step 2.2: Throw if response is not OK.
-      // Step 2.3: Return parsed JSON payload from the save API.
-      return null;
+      const response = await fetch('/api/checkers/2d/save', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ state })
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to save game state: ${response.status}`);
+      }
+      return response.json();
     }
 
     async function fetchSavedState() {
-      // Step 3.1: GET /api/checkers/2d/save.
-      // Step 3.2: Return null for 404 (no save exists).
-      // Step 3.3: Throw for other non-OK responses.
-      // Step 3.4: Return payload.state if present.
-      return null;
+      const response = await fetch('/api/checkers/2d/save');
+      if (response.status === 404) return null;
+      if(!response.ok) {
+        throw new Error(`Load request failed... status:${response.status}`);
+      }
+      const payload = await response.json();
+      return payload && payload.state ? payload.state : null;
     }
 
     function syncPlayModeControls() {
       const twoPlayerMode = dom.cpuToggle ? dom.cpuToggle.checked : false;
-      // Step 4.1: Map toggle value to Board.cpuEnabled.
+      Board.cpuEnabled = !twoPlayerMode;
       if (dom.cpuDifficultySelect) {
-        // Step 4.2: Disable difficulty selector when two-player mode is enabled.
+        dom.cpuDifficultySelect.disabled = twoPlayerMode;
       }
     }
 
     function syncControlsFromBoardState() {
       if (dom.cpuToggle) {
-        // Step 5.1: Reflect Board.cpuEnabled in the CPU toggle UI.
+        dom.cpuToggle.checked =! Board.cpuEnabled;
       }
       if (dom.cpuDifficultySelect) {
-        // Step 5.2: Reflect Board.cpuDifficulty and enabled/disabled state in dropdown.
+       dom.cpuDifficultySelect.value = Board.cpuDifficulty;
+       dom.cpuDifficultySelect.disabled = !Board.cpuEnabled
       }
       if (dom.animationToggle) {
-        // Step 5.3: Reflect Board.showCpuAnimation in animation toggle UI.
+       dom.animationToggle.checked = Board.showCpuAnimation;
       }
     }
 
@@ -74,53 +85,80 @@ export function initializeGame() {
     Board.updateTurnIndicator();
 
     if (dom.cpuToggle) {
-      // Step 6.1: Initialize CPU/two-player controls from current UI state.
+      syncPlayModeControls();
       dom.cpuToggle.addEventListener('change', function () {
-        // Step 6.2: Resync CPU/two-player settings.
-        // Step 6.3: If CPU is enabled and it is CPU turn, queue a CPU move.
+        syncPlayModeControls();
+        if (Board.playerTurn === 2){
+            Board.scheduleCpuMove();
+        }
       });
     }
 
     if (dom.cpuDifficultySelect) {
-      // Step 6.4: Initialize dropdown from Board.cpuDifficulty.
+      dom.cpuDifficultySelect.value = Board.cpuDifficulty;
       dom.cpuDifficultySelect.addEventListener('change', function (event) {
-        // Step 6.5: Update Board.cpuDifficulty from selected value.
-        // Step 6.6: If it is CPU turn, schedule move using the new difficulty.
+        Board.cpuDifficulty = event.target.value === 'hard' ? 'hard' : 'easy';
+        if (Board.playerTurn === 2) {
+          Board.scheduleCpuMove();
+        }
       });
     }
 
     if (dom.animationToggle) {
-      // Step 6.7: Initialize animation flag from checkbox state.
+      Board.showCpuAnimation = dom.animationToggle.checked;
       dom.animationToggle.addEventListener('change', function (event) {
-        // Step 6.8: Update Board.showCpuAnimation from checkbox state.
+        Board.showCpuAnimation = event.target.checked;
       });
     }
 
     if (dom.saveButton) {
       dom.saveButton.addEventListener('click', async function () {
-        // Step 7.1: Build serializable board state and persist it via API.
-        // Step 7.2: Show success status with saved timestamp.
-        // Step 7.3: Handle errors and show an error status message.
+        try {
+            const state = Board.buildSerializableState();
+            const persisted = await persistState(state);
+            const persistedAt = persisted && persisted.savedAt ? persisted.savedAt : state.savedAt;
+            const savedDate = new Date(persistedAt).toLocaleString();
+            setSaveStatus(`saved at ${savedDate}`, false);
+        } catch (error) {
+            console.error('Error saving game state:', error);
+            setSaveStatus(`Error saving game`, true);
+        }
       });
     }
 
     if (dom.resumeButton) {
       dom.resumeButton.addEventListener('click', async function () {
-        // Step 8.1: Load saved state from API.
-        // Step 8.2: Validate and apply loaded state to the board.
-        // Step 8.3: Sync controls after restore and show status message.
-        // Step 8.4: Handle errors and show an error status message.
+        try {
+            const savedState = await fetchSavedState();
+            if (!savedState) {
+                setSaveStatus('No saved game found.', true);
+                return;
+            }
+            const wasApplied = Board.applySerializedState(savedState);
+            if (!wasApplied) {
+                setSaveStatus('Failed to apply saved game state.', true);
+                return;
+            }
+            syncControlsFromBoardState();
+            const savedDate = savedState.savedAt ? new Date(savedState.savedAt).toLocaleString() : 'unknown time';
+            setSaveStatus(`resumed from ${savedDate}`, false);
+        } catch (error) {
+            console.error('Error resuming game state:', error);
+            setSaveStatus(`Error resuming game`, true);
+        }
       });
     }
 
     if (dom.clearButton) {
       dom.clearButton.addEventListener('click', function () {
-        // Step 9.1: Reset the board to initial game state.
+        Board.clear();
+        Board.initalize();
       });
     }
 
     document.addEventListener('click', function (event) {
       const pieceEl = event.target.closest('.piece');
+      //ignoring non-piece clicks
       if (!pieceEl) return;
 
       if (Board.cpuEnabled && Board.playerTurn == 2) return;
@@ -130,7 +168,7 @@ export function initializeGame() {
       const isPlayersTurn = parentClass == 'player' + Board.playerTurn + 'pieces';
       if (isPlayersTurn) {
         if (!Board.continuousjump && pieces[pieceEl.id].allowedtomove) {
-          if (pieceEl.classList.contains('selected')) selected = true;
+          if (pieceEl.classList.contains('selected')) selected = true;// this allows the user to click again to deselect piece chosen
           clearSelectedPieces();
           if (!selected) {
             pieceEl.classList.add('selected');
@@ -145,15 +183,45 @@ export function initializeGame() {
     });
 
     document.addEventListener('click', function (event) {
-      /*
-      Step 10.1: Ignore non-tile clicks.
-      Step 10.2: Ignore input when CPU controls current turn.
-      Step 10.3: Read currently selected piece.
-      Step 10.4: Resolve tile + piece objects and validate move range.
-      Step 10.5: Handle jump moves and chained jumps.
-      Step 10.6: Handle regular moves when jumps are not forced.
-      Step 10.7: Switch turns after successful move.
-      */
-    });
+     const tileEl = event.target.closest('.tile');
+     if(!tileEl) return;
+     
+     if (Board.cpuEnabled && Board.playerTurn == 2) return;
+     
+     const selectedElement = document.querySelector('.selected');
+     if (!selectedElement) return;
+     
+     const tileID = tileEl.id.replace('tile', '');
+    //  console.log('Tile clicked:', tileID);
+     const tile = tiles[tileID];
+     const piece = pieces[selectedElement.id];
+
+     const inRange = tile.inRange(piece);
+     console.log(inRange);
+     
+     if(inRange === 'wrong') return;
+
+     if(inRange === 'jump') {
+
+        if(piece.opponentJump(tile)) {
+            piece.move(tile);
+            if(piece.canJumpAny()) {
+                piece.element.classList.add('selected');
+                Board.continuousjump = true;
+            } else {
+                Board.changePlayerTurn();
+            }
+        }
+     } else if(inRange === 'regular') {
+        if(!piece.canJumpAny()) {
+            piece.move(tile);
+            Board.changePlayerTurn();
+        } else {
+            alert('You must jump if a jump is available!');
+        }
+     } 
+
+    })
+    
 
 }
