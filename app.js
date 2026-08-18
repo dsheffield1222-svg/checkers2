@@ -1,5 +1,7 @@
 import 'dotenv/config';
 
+import path from 'node:path'; //handling, transforming, and validating file and directory paths across different operating systems.
+import { promises as fs } from 'node:fs'; // import the promise-based file system API.
 import express from 'express';
 
 const app = express();
@@ -22,7 +24,7 @@ app.get('/checkers/3D', (req,res) => {
 })
 
 app.listen(port, () => {
-    console.log(`Server is running on http://localhost:${port}/checkers`);
+    console.log(`Server is running on http://localhost:${port}/checkers/2D or /checkers/3D (3D)`);
 })
 
 console.log(`Hello ${process.env.Hello}`);
