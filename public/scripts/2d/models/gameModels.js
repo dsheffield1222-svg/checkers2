@@ -12,10 +12,11 @@ export function Piece(element, position, deps) {
     this.makeKing = function () {
       // Hint:
       // 1) Update the piece sprite to the king image for this.player.
-      this.element.src = `images/king_${this.player}.png`;
+      this.element.style.backgroundImage = `url('/imgs/king${this.player}.png')`;
+
       // 2) Set this.king to true.
       this.king = true;
-      
+
     };
 
     this.move = function (tile) {
