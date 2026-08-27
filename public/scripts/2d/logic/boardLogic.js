@@ -11,12 +11,12 @@ export function createBoardController(dom) {
       // Blueprint: Re-enable this helper to reflect API wait state in toolbar UI.
       // Step A: Toggle a loading class on the toolbar root.
       // Step B: Update spinner aria-hidden for accessibility.
-      // if (dom.toolbarElement) {
-      //   dom.toolbarElement.classList.toggle('game-toolbar--loading', Boolean(isLoading));
-      // }
-      // if (dom.cpuLoadingIndicator) {
-      //   dom.cpuLoadingIndicator.setAttribute('aria-hidden', isLoading ? 'false' : 'true');
-      // }
+      if (dom.toolbarElement) {
+        dom.toolbarElement.classList.toggle('game-toolbar--loading', Boolean(isLoading));
+      }
+      if (dom.cpuLoadingIndicator) {
+        dom.cpuLoadingIndicator.setAttribute('aria-hidden', isLoading ? 'false' : 'true');
+      }
     }
 
     // Main game controller object.
