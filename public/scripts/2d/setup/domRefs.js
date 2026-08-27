@@ -4,8 +4,8 @@ export function getGameDomRefs() {
     // Blueprint: Uncomment these references if you enable toolbar loading UI.
     // Step A: Grab toolbar container to toggle loading class.
     // Step B: Grab spinner element to control aria-hidden.
-    // toolbarElement: document.querySelector('.game-toolbar'),
-    // cpuLoadingIndicator: document.getElementById('cpu-loading-indicator'),
+    toolbarElement: document.querySelector('.game-toolbar'),
+    cpuLoadingIndicator: document.getElementById('cpu-loading-indicator'),
     tilesElement: document.querySelector('div.tiles'),
     player1PiecesContainer: document.querySelector('.player1pieces'),
     player2PiecesContainer: document.querySelector('.player2pieces'),
