@@ -147,74 +147,58 @@ app.post('/api/checkers/2d/save', async (req, res) => {
 
 app.post('/api/checkers/2d/cpu-move', withThrottle(async (req, res) => {
 	const { state, legalMoves, difficulty } = req.body || {};
-    if( difficulty === 'hard'){
-        return res.status(500).json({ message: 'Hard difficulty is not available' });
-    }
-
-	if (!isValid2dGameState(state) || !Array.isArray(legalMoves) || legalMoves.length === 0) {
-		return res.status(400).json({ message: 'Invalid CPU move payload.' });
+    if (!isValid2dGameState(state) || !Array.isArray(legalMoves) || legalMoves.length === 0) {
+		return res.status(400).json({ error: 'Invalid request payload.' });
 	}
-
 	let moveIndex;
+
 	try {
 		moveIndex = buildLegalMoveIndex(legalMoves);
 	} catch {
-		return res.status(400).json({ message: 'Each legal move must include an integer moveId.' });
+		return res.status(400).json({ error: 'Invalid legalMoves format.' });
 	}
 
 	try {
-		const resolved = await resolveCpuMove({
-			state,
-			legalMoves,
-			difficulty: difficulty === 'hard' ? 'hard' : 'easy',
-			apiKey: process.env.GEMINI_API_KEY
-		});
+		const resolvedMove = await resolveCpuMove({ state,
+			 legalMoves,
+			  difficulty: difficulty === 'hard' ? 'hard' : 'easy',
+			   apiKey: process.env.GEMINI_API_KEY
+			});
+			const chosenMoveId = resolveMoveIdFromCoordinates(resolvedMove.moveId,
+				 resolvedMove.move,
+				  moveIndex.legalMoveByCoordinates
+				);
+				const chosenMove = resolvedMove.move;
+				const hasValidMoveId = Number.isInteger(chosenMoveId) && moveIndex.validMoveIds.has(chosenMoveId);
+				const hasValidCoordinates = isCoordinateMove(chosenMove);
 
-		const chosenMoveId = resolveMoveIdFromCoordinates(
-			resolved.moveId,
-			resolved.move,
-			moveIndex.legalMoveByCoordinates
-		);
-		const chosenMove = resolved.move;
-		const hasValidMoveId = Number.isInteger(chosenMoveId) && moveIndex.validMoveIds.has(chosenMoveId);
-		const hasValidCoordinates = isCoordinateMove(chosenMove);
+				if (!hasValidMoveId && !hasValidCoordinates) {
+					return res.status(500).json({ message: 'Resolved move is not valid.' });
+				}
 
-		if (!hasValidMoveId && !hasValidCoordinates) {
-			return res.status(502).json({ message: 'CPU move resolver did not return a valid move.' });
-		}
-
-		console.info(
-			'[CPU_API] difficulty=%s provider=%s fallback=%s move=%s legalMoves=%s',
-			difficulty === 'hard' ? 'hard' : 'easy',
-			resolved.provider,
-			Boolean(resolved.fallback),
-			hasValidMoveId ? chosenMoveId : JSON.stringify(chosenMove),
-			legalMoves.length
-		);
-    const response = {
-			moveId: hasValidMoveId ? chosenMoveId : null,
-			move: hasValidCoordinates ? chosenMove : null,
-			provider: resolved.provider,
-			fallback: Boolean(resolved.fallback)
-		};
-
-		return res.json(response);
+				console.info('[cpu_api] difficulty=%s provider=%s fallback=%s move=%s legalMoves=%s',
+					difficulty === 'hard' ? 'hard' : 'easy',
+					resolvedMove.provider,
+					Boolean(resolvedMove.fallback),
+					hasValidMoveId ? chosenMoveId : JSON.stringify(chosenMove),
+					legalMoves.length
+				);
+				const response = {
+					moveId: hasValidMoveId ? chosenMoveId : null,
+					move: hasValidCoordinates ? chosenMove : null,
+					provider: resolvedMove.provider,
+					fallback: Boolean(resolvedMove.fallback)
+				};
+				return res.json(response);
 	} catch (error) {
 		const isRateLimit = error?.status === 429 || error?.message?.includes('429');
 		const statusCode = isRateLimit ? 429 : 500;
-		const message = isRateLimit
-			? 'Gemini API rate limit exceeded. CPU will use heuristic fallback next move.'
-			: 'Failed to resolve CPU move.';
-
-		console.error(
-			'[CPU_API] Failed: statusCode=%d message=%s error=%s',
-			statusCode,
-			message,
-			error?.message || String(error)
-		);
+		const message = isRateLimit ? 'Rate limit exceeded.' : 'Failed to resolve CPU move.';
+		console.error('[cpu_api] Failed: statusCode=%s message=%s error=%s', statusCode, message, error?.message || String(error));
 		return res.status(statusCode).json({ message });
 	}
 }));
+
 
 app.get('/checkers', (req,res) => {
     res.redirect('/checkers/2D');
