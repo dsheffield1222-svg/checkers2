@@ -21,7 +21,7 @@ function buildBoardString(state) {
     .map((row, rowIndex) => row
       .map((cell, colIndex) => {
         const isKing = kings.has(`${rowIndex},${colIndex}`);
-        if (cell === 1) return isKing ? 'WK' : 'W';
+        if (cell === 1) return isKing ? 'RK' : 'R';
         if (cell === 2) return isKing ? 'BK' : 'B';
         return '.';
       })
@@ -31,31 +31,45 @@ function buildBoardString(state) {
 
 // Build the plain-language prompt that asks Gemini for the next black move.
 function buildPrompt(state) {
-  // Step 1: Convert the current board state into a readable board string.
-  const boardString = buildBoardString(state);
-
-  // Step 2: Write a prompt that tells Gemini it is playing as Blue.
-  const playerInstruction = 'You are playing checkers as Blue (player 2).';
-
-  // Step 3: Include the board string in the prompt so Gemini can see the current position.
-  const boardInstruction = 'Current board:\n' + boardString;
-
-  // Step 4: Ask Gemini for the next move only.
-  const moveInstruction = 'Choose Blue\'s next move and return only the best move.';
-
-  // Step 5: Instruct Gemini to return strict JSON in this shape: {"from":[row,col],"to":[row,col]}.
-  const formatInstruction = [
-    'Return strict JSON in exactly this shape:',
-    '{"from":[row,col],"to":[row,col]}',
-    'Do not include markdown or an explanation.'
+const boardString = buildBoardString(state);
+return [
+  "You are playing as the blue player in this game of checkers.",
+  "Here is the 8x8 board state, where  B  is blue, R is red, BK is blue king, RK is red king, and . is empty :",
+  '',
+  boardString,
+  '',
+  'Please provide the next move for the blue player.',
+  'Return ONLY Strict JSON in this shape: {"from":[row,col],"to":[row,col]} where row and col are 0-based indices.',
   ].join('\n');
-
-  // Step 6: Return the completed prompt string.
-  return [playerInstruction, boardInstruction, moveInstruction, formatInstruction].join('\n\n');
 }
 
 // Call Gemini with the current board state and return the move coordinates it suggests.
 export async function chooseGeminiMove({ state, legalMoves, apiKey }) {
+  if(!apiKey) {
+    throw new Error('GEMINI_API_KEY is missing. Please set it in your environment variables.');
+  }
+
+  const prompt = buildPrompt(state);
+  try {
+    const aiClient = new GoogleGenAI({apiKey: apiKey});
+    const response = await aiClient.models.generateContent({
+      model: 'gemini-3.6-flash',
+      contents: prompt,
+        });
+    console.log(`Gemini response: ${JSON.stringify(response)}`);
+    const nextMoveResponseText = response.candidates?.[0]?.content?.parts?.[0]?.text;
+    const nextMoveResponseObject = JSON.parse(nextMoveResponseText);
+    if(
+      nextMoveResponseObject &&
+      Array.isArray(nextMoveResponseObject.from) && nextMoveResponseObject.from.length === 2 &&
+      Array.isArray(nextMoveResponseObject.to) && nextMoveResponseObject.to.length === 2
+    ) {
+      return nextMoveResponseObject;
+    }
+    throw new Error(`Gemini returned invalid move JSON: ${nextMoveResponseText}`);
+  } catch (error) {
+    throw error;
+  }
   // Step 1: Validate that GEMINI_API_KEY is available before making a request.
   // Step 2: Build the prompt from the current board state.
   // Step 3: Create a GoogleGenAI client with the API key.
@@ -65,22 +79,24 @@ export async function chooseGeminiMove({ state, legalMoves, apiKey }) {
   // Step 7: Validate that the JSON contains `from` and `to` arrays.
   // Step 8: Return the parsed move object so the rest of the game can use it.
   // Step 9: Throw a helpful error if the API key is missing or the response is invalid.
-  return null;
+  
 }
-// Debug helper blueprint: list available Gemini models for troubleshooting.
-// async function listModels(client) {
-//     try {
-//       // Fetch the list of models
-//       const response = await client.models.list();
-//       console.log("Available Models:");
-//       const models = response.pageInternal;
-//       // The response contains a 'models' array
-//       models.forEach((model) => {
-//         console.log(`- Name: ${model.name}`);
-//         console.log('----------------------------');
-//       });
 
-//     } catch (error) {
-//         console.error("Error fetching models:", error);
-//     }
-// }
+
+// Debug helper blueprint: list available Gemini models for troubleshooting.
+async function listModels(client) {
+    try {
+      // Fetch the list of models
+      const response = await client.models.list();
+      console.log("Available Models:");
+      const models = response.pageInternal;
+      // The response contains a 'models' array
+      models.forEach((model) => {
+        console.log(`- Name: ${model.name}`);
+        console.log('----------------------------');
+      });
+
+    } catch (error) {
+        console.error("Error fetching models:", error);
+    }
+}
