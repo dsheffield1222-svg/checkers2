@@ -12,7 +12,10 @@ export function Piece(element, position, deps) {
     this.makeKing = function () {
       // Hint:
       // 1) Update the piece sprite to the king image for this.player.
-      // 2) Set this.king = true so movement rules allow backward moves.
+      this.element.src = `images/king_${this.player}.png`;
+      // 2) Set this.king to true.
+      this.king = true;
+      
     };
 
     this.move = function (tile) {
